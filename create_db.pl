@@ -3,9 +3,9 @@
  use DBI;
 use strict;
 
-use constant PERSONS => 100;
-use constant DATES => 100;
-use constant TRANSACTIONS => 50;
+use constant PERSONS => 2000;
+use constant DATES => 300;
+use constant TRANSACTIONS => 30;
 
  use constant NAMES => [
  'Alexander',
@@ -106,11 +106,11 @@ use constant TRANSACTIONS => 50;
  use constant SEX => ['F', 'M'];
 use constant FIELDS => {
 	name => {
-		probability => 10,
+		probability => 5,
 		function => sub {getRandName() . ' ' . getRandName()}
 	},
 	pledge => {
-		probability => 20,
+		probability => 15,
 		function => sub {
 			my $oldValue = shift;
 		       $oldValue->{owner} = getRandName() . ' ' . getRandName();
@@ -122,11 +122,11 @@ use constant FIELDS => {
 		function => sub {my $oldValue = shift; $oldValue->{sex} eq 'F' ? 'M' : 'F'}
 	},
 	species => {
-		probability => 50,
-		function => sub {"A" x sprintf("%d", rand()*7)}
+		probability => 15,
+		function => sub {return "A" x sprintf("%d", rand()*7)}
 	},
 	death => {
-		probability => 10,
+		probability => 20,
 		function => sub {
 			my $oldValue = shift; 
 			if ($oldValue->{death}) {
@@ -144,13 +144,13 @@ use constant FIELDS => {
  my $dbh = DBI->connect("DBI:mysql:anna", $ARGV[0], $ARGV[1]);
 
  my $sth = $dbh->prepare("
-	CREATE TABLE IF NOT EXISTS faces (inn INT, name VARCHAR(20), owner VARCHAR(20),
-	       species VARCHAR(20), pledge FLOAT, sex CHAR(1), birth DATE, death DATE, date_ins DATE);
+	 DROP TABLE faces;
 	 ");
 
  $sth->execute;
  $sth = $dbh->prepare("
-	DELETE FROM TABLE faces;
+	CREATE TABLE IF NOT EXISTS faces (inn VARCHAR(9), name VARCHAR(20), owner VARCHAR(20),
+	       species VARCHAR(20), pledge FLOAT, sex CHAR(1), birth DATE, death DATE, date_ins DATE);
 	 ");
 
  $sth->execute;
@@ -166,28 +166,31 @@ my $innArray = [];
 for (my $i = 0; $i<&PERSONS; $i++) {
 	my $pledge = rand()*2 < 1 ? 0 : rand()*1000000;
 	my $birth = DateTime->from_epoch(epoch => DateTime->now()->epoch()-sprintf("%d", rand()*90*365*24*60*60)-20*265*24*60*60);
-	my $inn = sprintf("%d", rand() * 10000000000);
-	$innArray->[$i] = $inn;
+	my $inn;
+       for (my $j = 0; $j < 9; $j++){
+       	     $inn .= sprintf("%d", rand() * 9);
+	}
+	push(@{$innArray}, $inn);
 	$innHash->{$inn} = {
 		name => getRandName() . ' ' . getRandName(),
 		sex => &SEX->[sprintf("%d", rand()*2)],
 		birth => $birth,
 		pledge => $pledge,
 		owner => $pledge > 0 ? getRandName() . ' ' . getRandName() : undef,
-		death => rand()*10 < 3 ? DateTime->from_epoch(epoch => $birth->epoch() + sprintf("%d", rand() * DateTime->now()->epoch()) - $birth->epoch()) : undef,
+		death => rand()*100 < 10 ? DateTime->from_epoch(epoch => $birth->epoch() + sprintf("%d", rand() * DateTime->now()->epoch()) - $birth->epoch()) : undef,
 	};
 	if ($sth_ins->execute(
 		$inn,
 		$innHash->{$inn}->{name},
 		$innHash->{$inn}->{owner},
-		$innHash->{$inn}->{spacies},
+		$innHash->{$inn}->{species},
 		$innHash->{$inn}->{pledge},
 		$innHash->{$inn}->{sex},
 		$innHash->{$inn}->{birth},
 		$innHash->{$inn}->{death},
 		DateTime->from_epoch(epoch => DateTime->now()->epoch() - &DATES * 24 * 60 * 60),
 	)){
-		print "insert data for $innHash->{$inn}->{name}\n";
+		print "insert data for $innHash->{$inn}->{name} $inn\n";
 	}
  } 
 
@@ -195,7 +198,7 @@ for (my $i = 0; $i<&PERSONS; $i++) {
  	for (my $j = 0; $j<&TRANSACTIONS; $j++) {
 	 	my $inn = $innArray->[sprintf("%d", rand()*(&PERSONS-1))];
 		my $changeField;
-		foreach my $field (keys %{&FIELDS}) {
+		foreach my $field (sort {int(rand(3))-1} keys %{&FIELDS}) {
 			if (rand() * 100 < &FIELDS->{$field}->{probability}){
 				$changeField = $field;
 				last;
@@ -210,7 +213,7 @@ for (my $i = 0; $i<&PERSONS; $i++) {
 			$inn,
 			$innHash->{$inn}->{name},
 			$innHash->{$inn}->{owner},
-			$innHash->{$inn}->{spacies},
+			$innHash->{$inn}->{species},
 			$innHash->{$inn}->{pledge},
 			$innHash->{$inn}->{sex},
 			$innHash->{$inn}->{birth},
