@@ -85,8 +85,8 @@ SELECT inn, owner, species, pledge, apple_date_from, date_ins,
 					) AS param_faces
 				WHERE 
 					start_inn = 1 
-					OR owner != prev_owner  
-					OR species != prev_species 
+					OR coalesce(owner, '!null!') != coalesce(prev_owner, '!null!')
+					OR coalesce(species, '!null!') != coalesce(prev_species, '!null!')
 				ORDER BY inn, date_ins
 				) AS where_faces
 		) AS inn_faces
