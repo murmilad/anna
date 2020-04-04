@@ -141,7 +141,7 @@ use constant FIELDS => {
 
  use DateTime;
 
- my $dbh = DBI->connect("DBI:mysql:anna", $ARGV[0], $ARGV[1]);
+ my $dbh = DBI->connect("DBI:Pg:dbname=anna", $ARGV[0], $ARGV[1]);
 
  my $sth = $dbh->prepare("
 	 DROP TABLE faces;
@@ -150,13 +150,13 @@ use constant FIELDS => {
  $sth->execute;
  $sth = $dbh->prepare("
 	CREATE TABLE IF NOT EXISTS faces (inn VARCHAR(9), name VARCHAR(20), owner VARCHAR(20),
-	       species VARCHAR(20), pledge FLOAT, sex CHAR(1), birth DATE, death DATE, date_ins DATE);
+	       species VARCHAR(20), pledge FLOAT, sex CHAR(1), birth DATE, death DATE, apple_date_from DATE,  date_ins DATE);
 	 ");
 
  $sth->execute;
 
-my $sql = "INSERT INTO faces (inn, name, owner, species, pledge, sex, birth, death, date_ins)
-       VALUES(?,?,?,?,?,?,?,?,?);";
+my $sql = "INSERT INTO faces (inn, name, owner, species, pledge, sex, birth, death, apple_date_from, date_ins)
+       VALUES(?,?,?,?,?,?,?,?,?,?);";
         
 my $sth_ins = $dbh->prepare($sql);
 
@@ -179,6 +179,7 @@ for (my $i = 0; $i<&PERSONS; $i++) {
 		owner => $pledge > 0 ? getRandName() . ' ' . getRandName() : undef,
 		death => rand()*100 < 10 ? DateTime->from_epoch(epoch => $birth->epoch() + sprintf("%d", rand() * DateTime->now()->epoch()) - $birth->epoch()) : undef,
 	};
+	my $date_ins = DateTime->from_epoch(epoch => DateTime->now()->epoch() - &DATES * 24 * 60 * 60);
 	if ($sth_ins->execute(
 		$inn,
 		$innHash->{$inn}->{name},
@@ -188,7 +189,8 @@ for (my $i = 0; $i<&PERSONS; $i++) {
 		$innHash->{$inn}->{sex},
 		$innHash->{$inn}->{birth},
 		$innHash->{$inn}->{death},
-		DateTime->from_epoch(epoch => DateTime->now()->epoch() - &DATES * 24 * 60 * 60),
+		DateTime->from_epoch(epoch => $date_ins->epoch()-sprintf("%d", rand()*5*365*24*60*60)),
+		$date_ins,
 	)){
 		print "insert data for $innHash->{$inn}->{name} $inn\n";
 	}
@@ -209,6 +211,7 @@ for (my $i = 0; $i<&PERSONS; $i++) {
 			$innHash->{$inn}->{$changeField} = &FIELDS->{$changeField}->{function}($innHash->{$inn});
 		}
 
+		my $date_ins = DateTime->from_epoch(epoch => DateTime->now()->epoch() - (&DATES-$i) * 24 * 60 * 60);
 		if ($sth_ins->execute(
 			$inn,
 			$innHash->{$inn}->{name},
@@ -218,7 +221,8 @@ for (my $i = 0; $i<&PERSONS; $i++) {
 			$innHash->{$inn}->{sex},
 			$innHash->{$inn}->{birth},
 			$innHash->{$inn}->{death},
-			DateTime->from_epoch(epoch => DateTime->now()->epoch() - &DATES-$i * 24 * 60 * 60),
+			DateTime->from_epoch(epoch => $date_ins->epoch()-sprintf("%d", rand()*5*365*24*60*60)),
+			$date_ins,
 		)){
 			print "insert data for $innHash->{$inn}->{name}\n";
 		}
