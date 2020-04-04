@@ -2,10 +2,10 @@ SELECT count(*), inn
 	FROM faces
 GROUP BY inn
 
-SELECT inn, owner, species, pledge, sex, birth, death, apple_date_from, date_ins
+SELECT inn, owner, species, pledge, apple_date_from, date_ins
 	FROM faces
-WHERE inn = '515482722'
-ORDER BY date_ins
+WHERE inn IN ('515482722', '234876877', '364121353')
+ORDER BY inn, date_ins
 
 insert into faces (inn, name, owner, species, pledge, sex, birth, death, apple_date_from, date_ins)
 	values
@@ -37,45 +37,57 @@ SELECT *
 					FROM faces
 		WHERE inn = '515482722' 
 
-
-SELECT inn, owner, species, pledge, birth, apple_date_from, date_ins,
+SELECT  *, 
+				LAG(owner,1) OVER(ORDER BY inn, date_ins) prev_owner,
+				LAG(species,1) OVER(ORDER BY inn, date_ins) prev_species,
+				CASE WHEN prev_inn IS null OR inn != prev_inn THEN 1 ELSE 0 END AS start_inn
+				FROM (
+					SELECT *,
+						LAG(inn, 1) OVER(ORDER BY inn, date_ins) prev_inn,
+						LEAD(inn, 1) OVER(ORDER BY inn, date_ins) next_inn
+					FROM faces
+					WHERE inn IN ('515482722', '234876877', '364121353') 
+					ORDER BY inn, date_ins
+				) ordered_faces
+			ORDER BY inn, date_ins
+		
+SELECT inn, owner, species, pledge, apple_date_from, date_ins,
 	CASE 
-		WHEN rownum_asc = 1 THEN apple_date_from
+		WHEN is_first_in_inn = 1 THEN apple_date_from
 		ELSE date_ins END 
 	AS date_from,
 	TO_CHAR (CASE 
-		WHEN next_date_ins IS NULL THEN '2999-12-31'
+		WHEN is_last_in_inn = 1 THEN '2999-12-31'
 		ELSE next_date_ins - interval '1 day' END 
 	, 'yyyy-MM-DD ') AS date_to
-	FROM (SELECT *,
-		LEAD(date_ins,1) OVER(ORDER BY date_ins) next_date_ins
-		FROM (
-			SELECT  *, 
-				LAG(owner,1) OVER(ORDER BY date_ins) prev_owner,
-				LAG(species,1) OVER(ORDER BY date_ins) prev_species
-				FROM (
-					SELECT *,
-						ROW_NUMBER() OVER (
-	 						PARTITION BY inn
-						    ORDER BY date_ins
-						) AS rownum_asc,
-						ROW_NUMBER() OVER (
-	 						PARTITION BY inn
-						    ORDER BY date_ins DESC
-						) AS rownum_desc
-					FROM faces
-				) ordered_faces
-			WHERE inn = '515482722' 
-		) AS lagged_faces
-	WHERE 
-		rownum_asc = 1 
-		OR (
-			rownum_desc = 1 
-			AND (
-				owner != prev_owner  
-				OR species != prev_species 
-			)
-		)
-		OR owner != prev_owner  
-		OR species != prev_species 
-	) AS leaded_faces
+	FROM (
+		SELECT *,
+			CASE WHEN prev_inn IS null OR inn != prev_inn THEN 1 ELSE 0 END AS is_first_in_inn,
+			CASE WHEN next_inn IS null OR inn != next_inn THEN 1 ELSE 0 END AS is_last_in_inn
+			FROM (
+				SELECT *,
+					LEAD(date_ins,1) OVER(ORDER BY inn, date_ins) next_date_ins,
+					LAG(inn, 1) OVER(ORDER BY inn, date_ins) prev_inn,
+					LEAD(inn, 1) OVER(ORDER BY inn, date_ins) next_inn
+					FROM (
+						SELECT  *, 
+							LAG(owner,1) OVER(ORDER BY inn, date_ins) prev_owner,
+							LAG(species,1) OVER(ORDER BY inn, date_ins) prev_species,
+							CASE WHEN prev_start_inn IS null OR inn != prev_start_inn THEN 1 ELSE 0 END AS start_inn
+							FROM (
+								SELECT *,
+									LAG(inn, 1) OVER(ORDER BY inn, date_ins) prev_start_inn
+								FROM faces
+								WHERE inn IN ('515482722', '234876877', '364121353') 
+								ORDER BY inn, date_ins
+							) ordered_faces
+						ORDER BY inn, date_ins
+					) AS param_faces
+				WHERE 
+					start_inn = 1 
+					OR owner != prev_owner  
+					OR species != prev_species 
+				ORDER BY inn, date_ins
+				) AS where_faces
+		) AS inn_faces
+ORDER BY inn, date_ins
